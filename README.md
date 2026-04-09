@@ -40,40 +40,63 @@ sequenceDiagram
 
 ## Collections of systems that rely on the mbaigo module
 
-- Service Registrar (asset: SQLite database)
-	- alternatively, esr (Ephemeral Service Register)
-- Orchestrator (asset:match making algorithm)
-- ds18b20 (asset: 1-wire temperature sensor)
-- Parallax4 (asset: servomotor)
-- Thermostat (asset: PID controller)
+### Core systems
 
-## Other systems under development (off dev branch)
-- UAClient (asset: OPC UA server)
-- Modboss (asset: Modbus slave or server)
-- Telegrapher (asset: MQTT broker)
-- Weatherman (asset: Davis Vantage Pro2 weatherstation)
-- Busdriver (asset: car engine via CAN-bus OBD2)
-- Photographer (asset: RPi camera)
-- Recorder (asset: USB microphone)
+| System | Description |
+|---|---|
+| `orchestrator` | Matches service consumers with providers by returning the URL of a currently available and authorized service |
+| `esr` | Ephemeral Service Registrar — lightweight in-memory alternative to a database-backed registrar, keeps track of currently available services |
 
+### Sensors and gateways
 
-Many of the testing is done with the Raspberry Pi (3, 4, &5) with [GPIO](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#gpio)
+| System | Description |
+|---|---|
+| `ds18b20` | Reads temperature from 1-wire DS18B20 sensors attached to a Raspberry Pi GPIO |
+| `beekeeper` | Exposes ZigBee devices paired to a RaspBee II / deCONZ gateway (plugs, lights, sensors) as Arrowhead services |
+| `meteorologue` | Exposes Netatmo weather station modules (indoor, outdoor, rain, wind) as Arrowhead services |
+| `weatherman` | Exposes a Davis Vantage Pro 2 weather station connected via USB serial as Arrowhead services |
+| `modboss` | Reads and writes Modbus coils, discrete inputs, holding and input registers over TCP or RTU |
+| `revolutionary` | Reads digital/analog inputs and writes digital outputs on a RevPi Connect 4 PLC |
+| `uaclient` | Browses an OPC UA server and exposes its nodes as readable (and where supported, writable) Arrowhead services |
+| `telegrapher` | Bridges MQTT topics into the Arrowhead local cloud — subscribes to topics (GET) and publishes to them (PUT) |
 
-## Default http ports for different systems
-- 20100  Certificate Authority
-- 20101  Maitre d’ (Authentication)
-- 20102  Service Registrar
-- 20103  Orchestrator
-- 20104  Authorizer
-- 20105  Modeler (local cloud semantics with GraphDB)
-- 20150  ds18b20 (1-wire sensor)
-- 20151  Parallax (PWM)
-- 20152  Thermostat
-- 20153  Revolutionary (Rev Pi PLC)
-- 20154  Levler (Level control)
-- 20160  Picam
-- 20161  USB microphone 
-- 20170  UA client (OPC UA)
-- 20171  Modboss (Modbus TCP)
-- 20172  Telegrapher (MQTT)
-- 20180  Influxer (Influx DB)
+### Actuators
+
+| System | Description |
+|---|---|
+| `parallax` | Controls a standard servo motor with PWM; exposes a rotation service (GET current position, PUT new position) |
+| `parallax4` | Controls four independent PWM servo motors; exposes a rotation service per channel |
+
+### Imaging
+
+| System | Description |
+|---|---|
+| `filmer` | Captures a still image from a connected camera and saves it as a file |
+| `photographer` | Captures a still image from a connected camera and provides a live video stream |
+| `recognizer` | Runs YOLOv8 object detection on camera frames and exposes detection results as a service |
+
+### Analytics and control
+
+| System | Description |
+|---|---|
+| `thermostat` | PID controller that consumes a temperature service and drives a servo motor to a target setpoint |
+| `leveler` | Consumes a temperature and a servo position service to maintain a setpoint via feedback control |
+| `flatner` | Adjusts a thermostat setpoint inversely to the electricity spot price to flatten peak energy demand |
+| `collector` | Ingests time-series signals from other services into an InfluxDB database |
+| `emulator` | Replays historical signals stored in JSON, XML, or CSV files as live Arrowhead services |
+| `nurse` | Monitors asset measurements and reports anomalies to a SAP system as maintenance notifications |
+| `sapper` | Simulates a SAP PM/MM system — receives maintenance notifications and exposes order creation and status as services |
+
+### Dashboard
+
+| System | Description |
+|---|---|
+| `beehive` | Web dashboard that discovers all OnOff services in the local cloud and presents them as toggle switches |
+
+### Modelling and documentation
+
+| System | Description |
+|---|---|
+| `cloudmodel` | Assembles SysML v2 BDD/IBD models of all systems currently registered in the local cloud |
+| `kgrapher` | Assembles OWL/RDF knowledge graph ontologies of all systems in the local cloud |
+| `messenger` | Centralized logging system that receives and stores log messages from other systems |
