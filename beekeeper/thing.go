@@ -96,6 +96,8 @@ func (c *DeviceCache) get(assetName, service string) *CachedMeasurement {
 // Traits is the runtime state for one ZigBee device unit asset.
 type Traits struct {
 	assetName string
+	lightID   string       // deCONZ light ID, non-empty only for devices with an on_off service
+	cfg       DeconzConfig // gateway connection parameters, used to forward PUT commands
 	cache     *DeviceCache
 }
 
@@ -113,7 +115,7 @@ func initTemplate() *components.UnitAsset {
 		Details:     map[string][]string{},
 		ServicesMap: components.Services{},
 		Traits: &DeconzConfig{
-			Host:    "192.168.1.109",
+			Host:    "localhost",
 			APIPort: 80,
 			WSPort:  80,
 			APIKey:  "your_deconz_api_key",
@@ -269,7 +271,15 @@ func newResources(uac usecases.ConfigurableAsset, sys *components.System) ([]*co
 
 	var assets []*components.UnitAsset
 	for _, ns := range namedSpecs {
-		ua := newDeviceAsset(ns.name, ns.displayName, ns.services, sys, cache)
+		// Find the deCONZ light ID for this asset (needed to forward PUT on_off commands).
+		lightID := ""
+		for _, e := range ns.entries {
+			if e.resource == "lights" {
+				lightID = e.id
+				break
+			}
+		}
+		ua := newDeviceAsset(ns.name, ns.displayName, ns.services, lightID, cfg, sys, cache)
 		assets = append(assets, ua)
 		log.Printf("beekeeper: asset %q  services: %v\n", ns.name, ns.services)
 	}
@@ -283,8 +293,8 @@ func newResources(uac usecases.ConfigurableAsset, sys *components.System) ([]*co
 }
 
 // newDeviceAsset creates a UnitAsset for one ZigBee device.
-func newDeviceAsset(assetName, displayName string, services []string, sys *components.System, cache *DeviceCache) *components.UnitAsset {
-	t := &Traits{assetName: assetName, cache: cache}
+func newDeviceAsset(assetName, displayName string, services []string, lightID string, cfg DeconzConfig, sys *components.System, cache *DeviceCache) *components.UnitAsset {
+	t := &Traits{assetName: assetName, lightID: lightID, cfg: cfg, cache: cache}
 
 	svcMap := make(components.Services)
 	for _, svc := range services {

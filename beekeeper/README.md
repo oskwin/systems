@@ -213,7 +213,7 @@ curl -s $BASE/sensors | python3 -m json.tool | grep "54:ef:44:..."
 
 If no ZHAPower sensor appears, the metering cluster was not discovered.
 
-**Fix** — remove the plug from deCONZ and re-pair it:
+**Fix** — use the repair script (see [repairplugs.sh](#repairplugssh)) or follow these manual steps:
 
 1. In the Phoscon web UI (`http://<pi-ip>/pwa`) go to **Devices → Smart Plugs**, select the plug, and delete it.
 2. Put deCONZ into pairing mode (**Devices → Add new device**).
@@ -223,6 +223,67 @@ If no ZHAPower sensor appears, the metering cluster was not discovered.
    curl -s $BASE/sensors | python3 -m json.tool | grep -A5 "ZHAPower"
    ```
 5. Restart beekeeper — it will automatically discover and merge the new sensor.
+
+### repairplugs.sh
+
+When deCONZ pairs a smart plug it sometimes discovers only the on/off cluster and misses the power metering cluster (0x0B04). The result is that the plug appears in beekeeper with an `on_off` service but no `power` service. The only reliable fix is to delete the plug from deCONZ and re-pair it so that deCONZ walks through all clusters again.
+
+`repairplugs.sh` automates this entirely. It:
+
+1. Queries deCONZ and lists every paired plug, showing whether power metering is present or missing
+2. Asks for confirmation before touching anything
+3. For each affected plug: deletes the stale entries, opens the pairing window, and waits up to 90 seconds for the ZHAPower sensor to appear
+4. Tells you to power-cycle the plug at exactly the right moment
+
+**Requirements:** `curl` and `python3` — both are standard on macOS, Linux, and Raspberry Pi OS.
+
+**Usage:**
+
+```bash
+# The API key is read automatically from systemconfig.json in the same directory
+./repairplugs.sh <pi-ip>
+
+# Or pass the API key explicitly
+./repairplugs.sh <pi-ip> <api-key>
+```
+
+**Example session:**
+
+```
+$ ./repairplugs.sh 192.168.1.109
+
+Connecting to deCONZ at 192.168.1.109 ...
+Connected.
+
+Found 3 plug(s):
+  [3] BathroomHeater            MISSING power sensor
+  [4] KitchenHeater             OK  (on_off + power)
+  [5] DiningroomHeater          MISSING power sensor
+
+2 plug(s) are missing a ZHAPower sensor.
+
+Attempt to re-pair them now? [y/N] y
+
+────────────────────────────────────────
+Re-pairing: BathroomHeater (light id=3)
+
+  [1/4] Deleting light entry 3 ...        Done.
+  [2/4] No stale sensors to clean up.
+  [3/4] Opening pairing window (180 s) ... Pairing window open.
+
+  >>> Power-cycle BathroomHeater: unplug it, wait 5 seconds, plug it back in.
+
+  [4/4] Waiting for ZHAPower sensor ...
+        ZHAPower sensor appeared: id(s) 19
+
+  SUCCESS: BathroomHeater now has power metering.
+...
+Done. Restart beekeeper to pick up the new services.
+```
+
+After the script completes, restart beekeeper and all successfully re-paired plugs will have both `on_off` and `power` services.
+
+---
 
 ### WebSocket keeps reconnecting
 
