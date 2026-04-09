@@ -1,28 +1,107 @@
-# # mbaigo System: Photographer
+# mbaigo System: Photographer
 
-The photographer system takes pictures using connected camera as a service.
-The take picture service stores the file locally and provides a link to get the file.
+The Photographer system exposes a Raspberry Pi camera as an Arrowhead service. A consumer system sends a GET request to the `photograph` service; Photographer triggers `rpicam-still` to capture a frame, saves the JPEG to a local `files/` directory, and returns the image URL in a `FileForm_v1` response. The consumer can then fetch the file directly from that URL.
+
+---
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant C as Consumer
+    participant P as Photographer
+    participant CAM as rpicam-still
+    participant FS as Local filesystem
+
+    C->>P: GET /photographer/PiCam/photograph
+    P->>CAM: exec rpicam-still -o files/image_<timestamp>.jpg
+    CAM->>FS: write JPEG file
+    CAM-->>P: exit 0
+    P-->>C: FileForm_v1 { fileURL: "http://host:port/.../files/image_<timestamp>.jpg" }
+    C->>P: GET /photographer/PiCam/files/image_<timestamp>.jpg
+    P-->>C: JPEG image bytes
+```
+
+---
+
+## Services
+
+| Service | Path | Method | Response | Description |
+|---|---|---|---|---|
+| `photograph` | `/photographer/<asset>/photograph` | GET | `FileForm_v1` | Triggers a capture and returns the URL of the saved JPEG |
+| `files` | `/photographer/<asset>/files/<filename>` | GET | JPEG | Serves a previously captured image file |
+
+---
+
+## Hardware requirements
+
+- Raspberry Pi (any model with a CSI camera connector)
+- Raspberry Pi Camera Module (V1 IMX219, V2 IMX219, HQ IMX477, or Camera Module 3 IMX708)
+- Raspberry Pi OS **Bookworm** or later (uses `rpicam-still` from the libcamera stack)
+
+> **One process at a time.** libcamera allows only one process to access the camera simultaneously. If `rpicam-still` is already running (e.g. launched by the Photographer service), any concurrent `rpicam-still` call from the terminal will fail with `no cameras available`. Wait for the current capture to finish before testing from the command line.
+
+---
+
+## Verifying the camera
+
+Check camera detection and a test capture before running the system:
+
+```bash
+# List cameras detected by libcamera
+rpicam-hello --list-cameras
+
+# Take a test shot
+rpicam-still -o test.jpg
+```
+
+> **Note:** `vcgencmd get_camera` always reports `supported=0 detected=0` on Bookworm — this queries the legacy firmware interface which is permanently disabled. It does not reflect libcamera's view of the camera.
+
+If `rpicam-still` reports `no cameras available`, check:
+1. The ribbon cable is firmly seated at both ends (contacts face the board on the Pi side).
+2. `camera_auto_detect=1` is present in `/boot/firmware/config.txt`.
+3. No other process is currently holding the camera open (`ps aux | grep rpicam`).
+
+---
+
+## Configuration
+
+Edit `systemconfig.json` to match your setup:
+
+| Field | Description |
+|---|---|
+| `ipAddresses` | IP addresses of the Raspberry Pi |
+| `protocolsNports` → `http` | Port the system listens on (default: 20160) |
+| `unit_assets[0].name` | Asset name, also used as part of the service URL |
+| `unit_assets[0].details` → `FunctionalLocation` | Where the camera is installed (e.g. `Entrance`) |
+| `unit_assets[0].details` → `Model` | Camera module model for documentation |
+| `coreSystems` | URLs of the Service Registrar, Orchestrator, CA, and maitreD |
+
+---
 
 ## Compiling
-To compile the code, one needs to initialize the *go.mod* file with ``` go mod init github.com/sdoque/photographer``` before running *go mod tidy*.
 
-The reason the *go.mod* file is not included in the repository is that when developing the mbaigo module, a replace statement needs to be included to point to the development code.
+Build for the current machine:
 
-To run the code, one just needs to type in ```go run .``` within a terminal or at a command prompt.
+```bash
+go build -o photographer
+```
 
-It is **important** to start the program from within it own directory (and each system should have their own directory) because it looks for its configuration file there. If it does not find it there, it will generate one and shutdown to allow the configuration file to be updated.
+Cross-compile for Raspberry Pi 4/5 (64-bit):
 
-The configuration and operation of the system can be verified using the system's web server using a standard web browser, whose address is provided by the system at startup.
+```bash
+GOOS=linux GOARCH=arm64 go build -o photographer_rpi64
+```
 
-To build the software for one's own machine,
-```go build -o parallax_imac```, where the ending is used to clarify for which platform the code is for.
+Copy to the Raspberry Pi:
 
+```bash
+scp photographer_rpi64 jan@192.168.1.x:rpiExec/photographer/
+```
 
-## Cross compiling/building
-The following commands enable one to build for different platforms:
-- Raspberry Pi 64: ```GOOS=linux GOARCH=arm64 go build -o photographer_rpi64```
+Run from the system's own directory — it reads `systemconfig.json` from the working directory. On first run without a config file, it generates one and exits so you can fill in the correct values.
 
-One can find a complete list of platform by typing *‌go tool dist list* at the command prompt
-
-If one wants to secure copy it to a Raspberry pi,
-`scp parallax_rpi64 jan@192.168.1.6:Desktop/photographer/` where user is the *username* @ the *IP address* of the Raspberry Pi with a relative (to the user's home directory) target *Desktop/photographer/* directory.photographer
+```bash
+cd ~/rpiExec/photographer
+./photographer_rpi64
+```

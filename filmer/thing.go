@@ -97,7 +97,7 @@ func (t *Traits) StreamTo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	cmd := exec.Command("libcamera-vid",
+	cmd := exec.Command("rpicam-vid",
 		"-t", "0",
 		"--codec", "mjpeg",
 		"--width", "640",
@@ -111,7 +111,7 @@ func (t *Traits) StreamTo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := cmd.Start(); err != nil {
-		http.Error(w, "failed to start libcamera-vid: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to start rpicam-vid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	go func() {

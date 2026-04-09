@@ -1,3 +1,5 @@
 module github.com/sdoque/systems/recognizer
 
-go 1.25.8
+go 1.26.1
+
+require github.com/sdoque/mbaigo v0.1.0-alpha.3

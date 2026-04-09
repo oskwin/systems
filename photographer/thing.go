@@ -96,7 +96,7 @@ func (t *Traits) takePicture() (f forms.FileForm_v1, err error) {
 	timestamp := time.Now().Format("20060102-150405")
 	filename := fmt.Sprintf("/files/image_%s.jpg", timestamp)
 
-	cmd := exec.Command("libcamera-still", "-o", "."+filename)
+	cmd := exec.Command("rpicam-still", "-o", "."+filename)
 
 	if err := cmd.Run(); err != nil {
 		return f, fmt.Errorf("failed to take picture: %w", err)
